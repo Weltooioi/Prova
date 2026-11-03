@@ -1,0 +1,4 @@
+node_modules/
+films/*/out/
+films/*/score.wav
+.DS_Store
