@@ -12,3 +12,7 @@ films/*/score.wav
 jack/*/st/
 jack/*/rev/
 jack/*/narr/
+jack/*/out/
+jack/*/test.html
+!jack/ep7_tunel/narr/
+!jack/ep7_tunel/narr/narr.mp3
