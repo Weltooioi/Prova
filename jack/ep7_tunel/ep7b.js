@@ -8,8 +8,8 @@ function E01(t, g) {
   const spin = Math.max(0, u - 2.2) * 1.5;
   if (u < 9.0) {
     const zf = u < 2 ? 7.5 + 8 * (1 - E.ss(E.seg(u, 0, 1.9))) : 7.5 - 9 * E.ss(E.seg(u, 7.0, 9.0));
-    drawValley(tw, { portal: zf < .3 ? 'round' : 'none' });
-    if (u < 2.2) camera([15, 5.5, 25], [0, 2.4, 6], .9); else if (u < 7.0) camera([2.2, 2.3, 1.2], [0, 1.6, 7.5], .95); else camera([8.6, 3.0, 10], [0, 1.8, 3], .9);
+    drawValley(tw, { portal: zf < .3 ? 'round' : 'none', trench: 1 });
+    if (u < 2.2) camera([9.5, 4.6, 1.8], [0, 1.6, 13], .95); else if (u < 7.0) camera([2.2, 2.3, 1.2], [0, 1.6, 7.5], .95); else camera([10, 4.2, 12.5], [0, 2.0, 1.5], .95);
     R.shC = [0, 0, 4]; R.shR = 12;
     const F = C_(T_(0, TUN.cy, zf)); drawTBM(F, spin);
     for (let i = 0; i < 14; i++) { const te = 7.35 + i * .12, a = i * 2.2; drawDust(u, te, [Math.cos(a) * 2.6, TUN.cy + Math.sin(a) * 2.4, .3], 4, '#c2b6a2'); }
@@ -17,19 +17,19 @@ function E01(t, g) {
     drawJack({ pos: [4.8, 0, 10.5], yaw: -2.0, shR: 1.45 * pt, elR: .1, pointR: pt, smile: 1, brow: .7, mouth: .3 * pt, blink: blinkF(u) });
     if (r.v === undefined && u > 2.2 && u < 7.0) { leader('RODA DE CORTE', [1.0, TUN.cy + .8, zf - .4], 360, 260, lk(u, 2.5, 4.9)); leader('DISCOS DE AÇO', Mx.pt(C_(F, Rz_(spin + PI / 3)), [0, 1.9, -.3]), 360, 260, lk(u, 5.0, 6.9)); }
   } else if (u < 13.95) {
-    const v = u - 9.0; setInside(.55); lined(-37.5); drawTBM(C_(T_(0, TUN.cy, -44.2)), spin);
+    const v = u - 9.0; setInside(.55); drawOutdoor(tw, { inside: 1 }); lined(-37.5); drawTBM(C_(T_(0, TUN.cy, -44.2)), spin);
     const cz = -1.5 - .7 * v; camera([.9, 1.8, cz], [-.2, 1.6, cz - 12], .95); R.shC = [0, 0, cz - 5]; R.shR = 8;
     const wk = walker(v, 0, 4.9, [-.5, 0, -7.5], [-.8, 0, -11.5], PI);
     drawJack(Object.assign({ pos: wk.pos, yaw: wk.yaw }, wk.w, { headYaw: .4 * Math.sin(v * 1.3), smile: 1, brow: .6, blink: blinkF(v) }));
     if (r.v === undefined) recap('TATUZÃO', 'o buraco sai redondo e liso', [2.3, 3.3, cz - 9], lk(u, 11.4, 13.95));
   } else if (u < 19.95) {
     const v = u - 13.95, ring = -15.75, nd = Math.min(6, Math.max(0, Math.floor((v - .2) / .9))), pr = E.c01(((v - .2) / .9) % 1);
-    setInside(.55); lined(-15.0); drawRing(ring, nd); drawErector(ring, nd >= 6 ? 1 : pr, nd); drawTBM(C_(T_(0, TUN.cy, -24.2)), spin);
+    setInside(.55); lined(-15.0); drawRing(ring, nd); drawErector(ring, nd >= 6 ? 1 : pr, nd); drawTBM(C_(T_(0, TUN.cy, -24.2)), spin, { gantry: 0 });
     camera([.3, 1.4, -5.5], [0, 2.0, -16], .95); R.shC = [0, 0, -12]; R.shR = 8;
     drawJack({ pos: [-.75, 0, -11.6], yaw: PI - .35, headPitch: -.25, smile: 1, brow: .6, mouth: .2, blink: blinkF(v) });
     if (r.v === undefined) { leader('BRAÇO MECÂNICO', [0, TUN.cy + 1.1, ring], 360, 260, lk(v, .3, 2.5)); leader('ANÉIS DE CONCRETO', [-2.4, 2.9, -12.75], 360, 260, lk(v, 2.7, 5.9)); }
   } else {
-    const v = u - 19.95, pk = E.sseg(v, 1.9, 4.6); setInside(.55); lined(-36); drawTBM(C_(T_(0, TUN.cy, -44.2)), spin);
+    const v = u - 19.95, pk = E.sseg(v, 1.9, 4.6); setInside(.55); drawOutdoor(tw, { inside: 1 }); lined(-36); drawTBM(C_(T_(0, TUN.cy, -44.2)), spin);
     camera([1.6, 1.45, -5.3], [-.4, 1.35, -10.5], .9); R.shC = [0, 0, -9]; R.shR = 7;
     drawDrops(tw, [-6.75, -8.25, -9.75, -11.25, -12.75, -14.25], 1, 4); drawPuddles(pk, 5);
     const look = E.sseg(v, .2, .7) * (1 - E.sseg(v, 1.8, 2.2)), step = E.sseg(v, 3.2, 3.5), sh = v > 3.6 && v < 4.8 ? Math.sin((v - 3.6) * 22) : 0;
@@ -115,7 +115,7 @@ function H01(t, g) {
 
 // ---------- final ----------
 function I01(t, g) {
-  const tw = g + t; drawValley(tw, { portal: 'modern', asphalt: true }); drawTunnel(tw, { kind: 'smooth', asphalt: true, gutter: 1, tilt: 1, lamps: 1, fans: 1, fanSpin: tw * 20 });
+  const tw = g + t; drawValley(tw, { portal: 'modern', asphalt: true }); drawTunnel(tw, { kind: 'smooth', asphalt: true, gutter: 1, tilt: 1, lamps: 1, fans: 1, fanSpin: tw * 20, noOutside: 1 });
   if (t < 1.2) camera([6.2, 2.2, 15.5], [1, 2.2, 2], .9); else { const k = E.sseg(t, 1.2, 5.0); camera(V.mix([6.2, 2.2, 15.5], [11, 9.5, 36], k), V.mix([1, 2.2, 2], [0, 4.5, 0], k), .9); }
   R.shC = [2, 0, 7]; R.shR = 16;
   for (const [x, z0, y, col] of [[.9, 22, PI, CAR.blue], [.9, 34, PI, CAR.yel], [-1.0, -6, 0, CAR.grn], [-1.0, -22, 0, CAR.wht]]) drawCar(carFrame(x, z0 + (y === 0 ? 1 : -1) * 6 * t, y), { col, lights: 1 });

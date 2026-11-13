@@ -52,17 +52,26 @@ const segAt = (z, s, A) => C_(T_(0, TUN.cy, z), Rz_(s + A), Rx_(PI / 2));
 // ---------- luz: dia lá fora, e dentro do túnel conforme a iluminação (0 = breu, 1 = lâmpadas acesas) ----------
 function setInside(lv, smoke = 0) {
   setSky(0); const d = .1 + .9 * lv; R.sun = V.norm([.25, .85, .45]); R.sunC = [1.1 * d, 1.0 * d, .85 * d]; R.sky = [.32 * d + .02, .34 * d + .02, .38 * d + .03]; R.gnd = [.2 * d, .18 * d, .15 * d];
-  R.fog = V.mix([.03 + .22 * lv, .028 + .2 * lv, .025 + .17 * lv], [.55, .54, .5], smoke); R.fogD = .012 + .02 * (1 - lv) + .22 * smoke;
+  R.fog = V.mix([.03 + .22 * lv, .028 + .2 * lv, .025 + .17 * lv], [.55, .54, .5], smoke); R.fogD = .004 + .016 * (1 - lv) + .22 * smoke;
 }
 // ---------- vale, estrada e montanha (vista de fora) ----------
-function drawValley(t, o = {}) {
-  setSky(0); R.t = t; const grass = AM.grass; draw(PL1, grass, S_(900, 1, 900));
-  const road = o.asphalt ? TM.asphalt : TM.dirt; draw(BOX, road, C_(T_(0, .012, 40), S_(5.6, .02, 80)));
+function drawValley(t, o = {}) { setSky(0); drawOutdoor(t, o); drawMountain(o); }
+// paisagem do lado de fora (sem a montanha). inside: vista de dentro do túnel, então o chão só existe em z > 0
+// (para não atravessar a pista do túnel) e há nuvens e morros também na direção da saída (+z)
+function drawOutdoor(t, o = {}) {
+  R.t = t; const grass = AM.grass;
+  if (o.inside) draw(PL1, grass, C_(T_(0, -.004, 450), S_(900, 1, 900))); else draw(PL1, grass, S_(900, 1, 900));
+  const road = o.asphalt ? TM.asphalt : TM.dirt; draw(BOX, road, C_(T_(0, o.inside ? -.01 : .012, 40), S_(5.6, .02, 80)));
   if (o.asphalt) for (let i = 0; i < 14; i++) draw(BOX, TM.line, C_(T_(0, .026, 3 + i * 5.5), S_(.14, .01, 2.6)));
+  if (o.trench) draw(BOX, M('#6f6a64'), C_(T_(0, .006, 18), S_(6.6, .02, 36)));
   const r = rng(17); for (let i = 0; i < 18; i++) { const s = i % 2 ? 1 : -1, x = s * (10 + r() * 14), z = 6 + i * 4.2 + r() * 3; drawTreeV(x, z, .9 + r() * .6, 40 + i); }
   for (let i = 0; i < 7; i++) draw(SPH, AM.mount, C_(T_(-200 + i * 70 + r() * 20, -5, -230 - r() * 60), S_(60 + r() * 30, 34 + r() * 26, 40)));
   const rc = rng(5); for (let i = 0; i < 11; i++) { const cx = -220 + i * 46 + rc() * 20 + t * .7, cy = 40 + rc() * 30, cz = -150 - rc() * 90; for (let j = 0; j < 4; j++) draw(SPH, AM.cloud, C_(T_(cx + j * 9 - 14, cy + (j % 2) * 3, cz), S_(11 + rc() * 5, 5 + rc() * 2, 7))); }
-  drawMountain(o);
+  if (o.inside) { // o que se vê pela boca do túnel: morros, mata e nuvens do outro lado do vale
+    const q = rng(41); for (let i = 0; i < 7; i++) draw(SPH, AM.mount, C_(T_(-200 + i * 70 + q() * 20, -5, 230 + q() * 60), S_(60 + q() * 30, 30 + q() * 20, 40)));
+    for (let i = 0; i < 16; i++) draw(SPH, i % 2 ? AM.crown : AM.crownD, C_(T_(-60 + i * 8 + q() * 4, 2, 95 + q() * 15), S_(5 + q() * 2, 4 + q() * 2, 4)));
+    for (let i = 0; i < 9; i++) { const cx = -160 + i * 42 + q() * 20 + t * .7, cy = 34 + q() * 26, cz = 150 + q() * 80; for (let j = 0; j < 4; j++) draw(SPH, AM.cloud, C_(T_(cx + j * 9 - 14, cy + (j % 2) * 3, cz), S_(11 + q() * 5, 5 + q() * 2, 7))); }
+  }
 }
 function drawTreeV(x, z, s, seed) { const r = rng(seed); draw(CYL, AM.trunk, C_(T_(x, 1.1 * s, z), S_(.22 * s, 2.2 * s, .22 * s))); for (let i = 0; i < 3; i++) draw(SPH, i % 2 ? AM.crown : AM.crownD, C_(T_(x + (r() - .5) * .9 * s, (2.6 + i * .7) * s, z + (r() - .5) * .9 * s), S_((1.5 - i * .25) * s, (1.25 - i * .15) * s, (1.5 - i * .25) * s))); }
 // o: portal = 'none' | 'cave' | 'rough' | 'round' | 'modern'; cave/hole: 0..1 (tamanho da abertura)
@@ -92,7 +101,7 @@ function drawMountain(o = {}) {
 // ---------- interior do túnel ----------
 // o: kind 'rough' | 'smooth'; end = profundidade da frente de escavação (rocha que fecha o túnel); lit: lâmpadas (0..1, acendem do começo ao fim)
 function drawTunnel(t, o = {}) {
-  R.t = t; const end = o.end || TUN.L;
+  R.t = t; const end = o.end || TUN.L; if (!o.noOutside) drawOutdoor(t, { inside: 1, asphalt: o.asphalt });
   if (o.kind === 'rough') { draw(tubeGeo('rough', roughR), TM.wallR, Mx.I()); draw(floorGeo(), TM.floorR, Mx.I()); }
   else {
     draw(tubeGeo('smooth', () => TUN.R), TM.conc, Mx.I());
@@ -164,17 +173,54 @@ function drawCar(F, o = {}) {
 // fumaça de escapamento que fica no ar (idade cresce com o tempo de cena)
 function drawExhaust(t, p, k, seed) { if (k <= 0) return; const r = rng(seed); for (let i = 0; i < 6; i++) { const age = ((t * 1.6 + i / 6) % 1); draw(SPH, M('#8f8d88', { a: .45 * (1 - age) * k, nosh: 1, norecv: 1 }), C_(T_(p[0] + (r() - .5) * .3, p[1] + age * .8, p[2] - age * 1.4), S_(.15 + age * .5))); } }
 // ---------- tatuzão (tuneladora). F: quadro na frente da máquina (a roda de corte fica em z local = 0 e o corpo vai para -z... ou +z conforme o uso) ----------
+// ---------- tatuzão (tuneladora). F: centro da roda de corte; a máquina vai para +z local (a roda morde em -z) ----------
+// o.gantry: comboio de apoio atrás do escudo (pórticos sobre trilhos, esteira, cabine); o.cradle: berço de lançamento (fora da montanha)
+const TBMM = { stripe: M('#1d1d1f', { spec: .2 }), hose1: M('#2f7d4a', { spec: .3 }), hose2: M('#b8352b', { spec: .3 }), cab: M('#e8e6df', { spec: .3 }), glass: M('#2b5878', { spec: 1, gloss: 90 }),
+  belt: M('#26272b', { spec: .2 }), rail: M('#5d6168', { spec: .6, gloss: 50 }), beacon: M('#ff9a1a', { unlit: 1, nosh: 1, e: [1.6, .7, .05] }), chrome: M('#d9dde2', { spec: 1, gloss: 90 }), slot: M('#141414', { nosh: 1 }) };
 function drawTBM(F, spin, o = {}) {
-  const R0 = TUN.R - .05, back = o.back === undefined ? 1 : -1; // back = +1: corpo atrás da roda no sentido +z local
-  // roda de corte
-  const W = C_(F, Rz_(spin)); draw(CYL, TM.tbm, C_(W, Rx_(PI / 2), S_(R0, .35, R0)));
-  for (let s = 0; s < 6; s++) { const sp = C_(W, Rz_(s * PI / 3)); draw(BOX, TM.tbmD, C_(sp, T_(0, R0 / 2, -.2), S_(.32, R0, .1))); for (let k = 1; k <= 4; k++) { const rr = k * R0 / 4.6; draw(CYL, TM.steel, C_(sp, T_(.0, rr, -.27), Rz_(PI / 2), S_(.16, .07, .16))); } }
-  draw(CYL, TM.steel, C_(W, T_(0, 0, -.25), Rx_(PI / 2), S_(.35, .15, .35)));
-  // escudo e corpo
-  draw(CYL, TM.tbmD, C_(F, T_(0, 0, back * 3.4), Rx_(PI / 2), S_(R0 - .02, 6.4, R0 - .02)));
-  for (let i = 0; i < 3; i++) draw(TORUS(.04), TM.steelD, C_(F, T_(0, 0, back * (1.2 + i * 2.2)), Rx_(PI / 2), S_(R0)));
-  return C_(F, T_(0, 0, back * 6.6));
+  const R0 = TUN.R - .05, G = o.gantry === undefined ? 1 : o.gantry;
+  // roda de corte (gira): disco, aro, 6 braços em relevo, discos de corte saltados, aberturas para a pedra e cone central
+  const W = C_(F, Rz_(spin));
+  draw(CYL, TM.tbmD, C_(W, T_(0, 0, .05), Rx_(PI / 2), S_(R0, .5, R0)));
+  draw(TORUS(.06), TM.tbm, C_(W, T_(0, 0, -.22), Rx_(PI / 2), S_(R0 - .1)));
+  for (let s = 0; s < 6; s++) {
+    const sp = C_(W, Rz_(s * PI / 3));
+    draw(BOX, TM.tbm, C_(sp, T_(0, R0 / 2 + .2, -.34), S_(.42, R0 - .3, .28)));
+    for (let k = 0; k < 5; k++) { const rr = .7 + k * .48, f = C_(sp, T_((k % 2 ? .12 : -.12), rr, -.5)); draw(BOX, TM.steelD, C_(f, T_(0, 0, .07), S_(.24, .3, .12))); draw(CYL, TM.steel, C_(f, Rz_(PI / 2), S_(.17, .06, .17))); }
+    const gp = C_(W, Rz_(s * PI / 3 + PI / 6)); draw(BOX, TBMM.slot, C_(gp, T_(0, R0 - .55, -.21), S_(.34, .7, .02)));
+    for (let k = 0; k < 2; k++) { const f = C_(gp, T_(0, 1.1 + k * .6, -.26)); draw(BOX, TM.steelD, C_(f, T_(0, 0, .04), S_(.2, .26, .08))); draw(CYL, TM.steel, C_(f, Rz_(PI / 2), S_(.15, .05, .15))); }
+  }
+  draw(CONE, TM.steel, C_(W, T_(0, 0, -.35), Rx_(-PI / 2), S_(.42, .45, .42)));
+  // escudo da frente com faixas de advertência, escudo da cauda e emendas com parafusos
+  draw(CYL, TM.tbm, C_(F, T_(0, 0, 2.45), Rx_(PI / 2), S_(R0 - .01, 4.3, R0 - .01)));
+  for (let i = 0; i < 24; i++) if (i % 2) draw(BOX, TBMM.stripe, C_(F, Rz_(i * PI / 12), T_(0, R0 + .005, .7), S_(.62, .02, .35)));
+  draw(CYL, TM.steelD, C_(F, T_(0, 0, 5.6), Rx_(PI / 2), S_(R0 - .05, 2.0, R0 - .05)));
+  for (const z of [1.6, 3.2, 4.6]) { draw(TORUS(.025), TM.steelD, C_(F, T_(0, 0, z), Rx_(PI / 2), S_(R0 + .01))); for (let i = 0; i < 16; i++) draw(SPH, TM.steel, C_(F, Rz_(i * PI / 8), T_(0, R0 + .02, z + .08), S_(.04))); }
+  // traseira: anteparo, macacos hidráulicos que empurram a máquina e rosca que leva a pedra para a esteira
+  draw(CYL, TM.steelD, C_(F, T_(0, 0, 6.55), Rx_(PI / 2), S_(R0 - .1, .1, R0 - .1)));
+  for (let i = 0; i < 12; i++) { const a = i * PI / 6, rr = R0 - .45, x = Math.cos(a) * rr, y = Math.sin(a) * rr; draw(CYL, TM.tbmD, C_(F, T_(x, y, 6.95), Rx_(PI / 2), S_(.13, .8, .13))); draw(CYL, TBMM.chrome, C_(F, T_(x, y, 7.55), Rx_(PI / 2), S_(.07, .5, .07))); }
+  lineCyl(Mx.pt(F, [0, -.9, 6.6]), Mx.pt(F, [0, .9, 9.0]), .32, TM.steel);
+  draw(SPH, TBMM.beacon, C_(F, T_(1.3, 1.9, 6.7), S_(.09)));
+  if (!G) return C_(F, T_(0, 0, 7.6));
+  // comboio de apoio: pórticos sobre trilhos, plataforma, esteira, cabine, armários, mangueiras, corrimão e luzes
+  const by = -TUN.cy;   // chão (em relação ao eixo)
+  for (const x of [-1.6, 1.6]) draw(BOX, TBMM.rail, C_(F, T_(x, by + .05, 13.5), S_(.1, .1, 12)));
+  for (let k = 0; k < 5; k++) { const z = 8.4 + k * 2.4;
+    for (const x of [-2.05, 2.05]) { draw(BOX, TM.tbm, C_(F, T_(x, by + 1.55, z), S_(.16, 3.0, .16))); draw(CYL, AM.tire, C_(F, T_(x * .78, by + .22, z), Rz_(PI / 2), S_(.2, .14, .2))); }
+    draw(BOX, TM.tbm, C_(F, T_(0, by + 3.05, z), S_(4.3, .18, .2))); draw(BOX, TM.tbm, C_(F, T_(0, by + 1.15, z), S_(4.3, .14, .16))); }
+  draw(BOX, TM.steelD, C_(F, T_(0, by + 1.25, 13.2), S_(4.0, .06, 10)));
+  for (const x of [-1.95, 1.95]) { draw(BOX, TM.tbm, C_(F, T_(x, by + 2.0, 13.2), S_(.04, .04, 10))); for (let k = 0; k < 9; k++) draw(BOX, TM.tbm, C_(F, T_(x, by + 1.65, 8.6 + k * 1.15), S_(.04, .75, .04))); }
+  lineCyl(Mx.pt(F, [0, .9, 9.0]), Mx.pt(F, [0, by + 3.4, 18.5]), .2, TBMM.belt);
+  for (let k = 0; k < 7; k++) { const p = V.mix(Mx.pt(F, [0, .95, 9.6]), Mx.pt(F, [0, by + 3.3, 18]), k / 6); draw(SPH, M('#8a7f70'), C_(T_(p[0], p[1] + .14, p[2]), S_(.14, .08, .16))); }
+  const cab = C_(F, T_(-1.15, by + 2.05, 10.4)); draw(BOX, TBMM.cab, C_(cab, S_(1.1, 1.3, 1.6))); draw(BOX, TBMM.glass, C_(cab, T_(.56, .15, 0), S_(.02, .6, 1.2))); draw(BOX, TBMM.glass, C_(cab, T_(0, .15, -.81), S_(.8, .6, .02)));
+  draw(SPH, TBMM.beacon, C_(cab, T_(0, .75, 0), S_(.1)));
+  for (let k = 0; k < 3; k++) draw(BOX, M('#c9ccd1', { spec: .3 }), C_(F, T_(1.35, by + 1.85, 12.5 + k * 1.3), S_(.7, 1.1, .9)));
+  for (const [x, mat, h] of [[1.85, TBMM.hose1, .55], [1.75, TBMM.hose2, .75], [-1.85, TBMM.hose1, .9]]) lineCyl(Mx.pt(F, [x, h, 6.6]), Mx.pt(F, [x, h - .2, 18.5]), .05, mat);
+  for (let k = 0; k < 4; k++) draw(BOX, TM.lampOn, C_(F, T_(k % 2 ? 1.9 : -1.9, by + 2.95, 9 + k * 2.6), S_(.18, .05, .3)));
+  return C_(F, T_(0, 0, 18.5));
 }
+// berço de lançamento: vigas de aço onde o tatuzão se apoia antes de entrar na montanha
+function drawCradle(z0, len) { for (const x of [-1.3, 1.3]) draw(BOX, TBMM.rail, C_(T_(x, .12, z0 + len / 2), S_(.35, .24, len))); for (let k = 0; k <= len / 2; k++) draw(BOX, TM.steelD, C_(T_(0, .08, z0 + k * 2), S_(3.4, .16, .3))); }
 // braço montador: coloca o segmento i de 6 no anel que fica na posição z (quadro do túnel)
 function drawErector(z, prog, nDone) {
   const segA = PI / 3, a0 = -PI / 2 + nDone * segA; // segmentos dão a volta a partir de baixo
