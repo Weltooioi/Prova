@@ -18,7 +18,7 @@ Observações:
 Regras de qualidade em `CLAUDE.md`, instalação em `SETUP.md`.
 
 ```
-npm install                              # uma vez, na raiz
+npm install                              # só fora da nuvem; nas sessões na nuvem o Playwright já vem instalado
 node render.mjs prova-intro --contact    # folha de contato: um quadro por batida
 node render.mjs prova-intro              # vídeo final em films/prova-intro/out/
 ```
