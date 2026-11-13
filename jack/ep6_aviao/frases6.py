@@ -1,0 +1,16 @@
+# Frases da narração final do Ep. 6, na ordem do áudio.
+F = ["Você olha pros pássaros e pensa: \"ah, eu também consigo\".", "Amarra dois panos nos braços, corre, pula...", "e descobre do pior jeito que braço não é asa.", "Beleza, bater asa não rola.",
+"Então você monta uma asa fixa, de madeira e tecido.", "O segredo tá no formato: o ar passa por ela e empurra tudo pra cima.", "Isso se chama sustentação.", "Só que, sem nada pra equilibrar, a asa capota no ar.",
+"Aí você coloca uma cauda, com uma parte deitada e outra em pé, que segura o nariz apontado pra frente.", "Pronto, você tem um planador!", "Ele voa retinho...", "retinho até demais.", "Direto na árvore.",
+"Faltou o quê?", "Fazer curva.", "Então você joga o peso do corpo pro lado e o planador obedece.", "Agora dá até pra pousar inteiro!", "Só que o voo dura uns segundinhos.", "Tá faltando um empurrão.",
+"Primeira ideia: pedais ligados numa hélice.", "Funciona...", "por uns dez segundos.", "Depois a perna pede arrego.",
+"Segunda ideia: um motor a vapor!", "Forte ele é.", "Mas, com caldeira e água, pesa tanto que o aparelho nem sai do chão.",
+"A saída é o motor a gasolina: pequeno, leve e bravo.", "Ele queima o combustível dentro dos cilindros, e cada explosãozinha empurra um pistão.", "Tá, o motor gira.", "E como é que giro vira empurrão?",
+"Com uma hélice de verdade, esculpida com as pás torcidas.", "Cada pá é uma asinha girando: joga o ar pra trás e puxa o avião pra frente.", "Só que, se arrastando no chão, ele não ganha velocidade nem a pau.",
+"Então você instala rodas, o trem de pouso, e corre pela pista até a asa fazer o trabalho dela.", "E...", "decolou!", "Mas lá em cima, jogar o corpo pro lado já não resolve nada.",
+"Você cria então peças que se mexem: o leme, na cauda, vira pros lados; o profundor faz subir e descer; e os ailerons, nas asas, inclinam o avião.", "Tudo na sua mão, com um manche e dois pedais.", "Só que, quando você acelera, a madeira e o tecido não aguentam o tranco.",
+"Hora de trocar tudo por alumínio: leve e resistente.", "Agora você voa alto e rápido...", "e vira picolé, porque lá em cima faz trinta graus negativos.", "Solução: fechar a cabine com vidro.",
+"Quer ir mais rápido ainda?", "As rodas penduradas seguram o avião no ar.", "Então você faz elas se recolherem pra dentro.", "Melhorou!", "Mas aí quem chega no limite é a hélice.",
+"Então você aposenta a hélice e parte pro motor a jato: ele suga o ar, espreme, queima com combustível e solta tudo pra trás com uma força absurda.", "Agora você voa lá no alto, onde o ar é fininho.", "Tão fininho que falta oxigênio pra respirar.",
+"O último truque é pressurizar a cabine, mantendo lá dentro um ar que dá pra respirar.", "Depois é só caprichar no interior: poltronas com cinto, janelas, bagageiros, banheiros, uma cozinha pro lanchinho, o porão pras malas e as saídas de emergência.",
+"E pronto!", "Dessa forma, você construiu um avião moderno!"]

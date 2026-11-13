@@ -27,7 +27,8 @@ Cada filme fica em `films/<nome>/` (`film.js` desenha, `score.mjs` gera o som).
 
 ### Jack
 
-`films/jack-original/` usa o motor e o personagem originais (`lib/jack-engine/`). Regras em `CLAUDE.md`.
+Código de produção original em `jack/` (leia `jack/LEIA-ME.md`). Episódio novo: copie `jack/ep6_aviao/`.
+`films/jack-original/` usa o mesmo motor e personagem dentro do estúdio. Regras em `CLAUDE.md`.
 
 ### 3D (Three.js)
 

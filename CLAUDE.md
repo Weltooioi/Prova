@@ -70,6 +70,15 @@ Fonts: the studio pair is Inter Display (display) + JetBrains Mono (UI); list th
 The series method, script format, mandatory character rules and sound rules live in the `curioso-jack-animacao` skill;
 load it for any Jack episode. In this repo:
 
+- **Episodes are produced with `jack/`**, the original production code (see `jack/LEIA-ME.md`): `ep6_aviao/` is the
+  latest method (engine, `drawJack`, worlds, scenes, text layer, narration alignment, SFX, music, mix, render),
+  `ep5_navios/` the previous episode. Start a new episode by copying `ep6_aviao/`. It runs here as is: `capture.js`
+  uses the pre-installed Chromium, `jack/package.json` makes it CommonJS, Python needs numpy + scipy.
+  Commands (from the episode folder): `./sheet.sh name t1,t2,...` (stills -> st/name.jpg), `./render.sh "a01:0:8 ..."`
+  (one mp4 per scene in out/seg), `python3 music6.py out/musicN.wav <seconds>`, `python3 sfx6.py out/sfxN narr/mapa.json`,
+  `./mix6.sh` (needs the ElevenLabs narration in `narr/`). About 0.5 s per frame here.
+- **For studio films** (outside an episode) the same engine and character are in `lib/jack-engine/`, copied from
+  `jack/ep6_aviao` with the canvas size read from `<canvas id="gl">`; re-copy if the episode code changes.
 - **The character and engine are the originals**, not a reconstruction: `lib/jack-engine/engine.js` (WebGL2 engine,
   no libraries) and `lib/jack-engine/jack.js` (`drawJack(P)`), extracted from `reference/jack/Jack_modelo_3D.html`.
   Load them as classic scripts before the film module; the page needs `<canvas id="gl">` (see `films/jack-original`).

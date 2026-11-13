@@ -8,3 +8,7 @@ films/*/score.wav
 *.wav
 .DS_Store
 !reference/**/*.mp4
+!jack/sons_exemplo/*.wav
+jack/*/st/
+jack/*/rev/
+jack/*/narr/
