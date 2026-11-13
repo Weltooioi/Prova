@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "historyId": "cbbf1154-f594-4bce-a911-3fb54c3f2aec",
+  "currentRevision": null,
+  "pendingChanges": false,
+  "files": {
+    "AGENTS.md": {
+      "hash": "268ff46777938da818baa92a718571785e9acf2cef2d3ffbacbb93483dcba37a",
+      "content": "/root/.cache/hyperframes/history/cbbf1154-f594-4bce-a911-3fb54c3f2aec/blobs/26/268ff46777938da818baa92a718571785e9acf2cef2d3ffbacbb93483dcba37a"
+    },
+    "CLAUDE.md": {
+      "hash": "268ff46777938da818baa92a718571785e9acf2cef2d3ffbacbb93483dcba37a",
+      "content": "/root/.cache/hyperframes/history/cbbf1154-f594-4bce-a911-3fb54c3f2aec/blobs/26/268ff46777938da818baa92a718571785e9acf2cef2d3ffbacbb93483dcba37a"
+    },
+    "hyperframes.json": {
+      "hash": "53dbce1e19aa713cbb12ee0bc4d206143b45ab15e6ffbfcaa8f69572d4d24d50",
+      "content": "/root/.cache/hyperframes/history/cbbf1154-f594-4bce-a911-3fb54c3f2aec/blobs/53/53dbce1e19aa713cbb12ee0bc4d206143b45ab15e6ffbfcaa8f69572d4d24d50"
+    },
+    "index.html": {
+      "hash": "bb26a8f483c4b8ed34f95e1a3fd8bd97e06440351dcb1c24c71d2abdbb1a1d15",
+      "content": "/root/.cache/hyperframes/history/cbbf1154-f594-4bce-a911-3fb54c3f2aec/blobs/bb/bb26a8f483c4b8ed34f95e1a3fd8bd97e06440351dcb1c24c71d2abdbb1a1d15"
+    },
+    "meta.json": {
+      "hash": "d55566b0e8cef6d436d1020d575f4d3acfa93ba73397b8126e22d31b8f565c4a",
+      "content": "/root/.cache/hyperframes/history/cbbf1154-f594-4bce-a911-3fb54c3f2aec/blobs/d5/d55566b0e8cef6d436d1020d575f4d3acfa93ba73397b8126e22d31b8f565c4a"
+    },
+    "package.json": {
+      "hash": "7cf17757c3a607b9af1daf4d39e123326cf5d87b2c6a611989b0f29e9b98c447",
+      "content": "/root/.cache/hyperframes/history/cbbf1154-f594-4bce-a911-3fb54c3f2aec/blobs/7c/7cf17757c3a607b9af1daf4d39e123326cf5d87b2c6a611989b0f29e9b98c447"
+    }
+  },
+  "revisions": {},
+  "checks": {
+    "latest": null,
+    "revisions": {},
+    "unversioned": []
+  },
+  "snapshots": {
+    "latest": null,
+    "revisions": {},
+    "unversioned": []
+  },
+  "renders": {
+    "latest": {
+      "id": "9c9fe8f8-0d7d-4206-a724-6ea58386786f",
+      "completedAt": 1794572759111,
+      "output": "/home/user/Prova/hyperframes-app/renders/teste.mp4",
+      "status": "completed",
+      "revision": null
+    },
+    "retainedRevisions": []
+  },
+  "pendingArtifactCleanup": []
+}
