@@ -24,3 +24,9 @@ node render.mjs prova-intro              # vídeo final em films/prova-intro/out
 ```
 
 Cada filme fica em `films/<nome>/` (`film.js` desenha, `score.mjs` gera o som).
+
+### 3D (Three.js)
+
+`films/prova-3d/` mostra como fazer: a cena 3D é posicionada a partir de `t` e desenhada no quadro.
+Three.js, opentype.js e a fonte Inter Display Black ficam em `lib/vendor/` e `assets/fonts/` (funciona sem instalar nada).
+Importe `lib/three-shim.js` antes de `three` para manter o render determinístico.
