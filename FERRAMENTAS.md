@@ -25,6 +25,10 @@ node render.mjs prova-intro              # vídeo final em films/prova-intro/out
 
 Cada filme fica em `films/<nome>/` (`film.js` desenha, `score.mjs` gera o som).
 
+### Jack
+
+`films/jack-original/` usa o motor e o personagem originais (`lib/jack-engine/`). Regras em `CLAUDE.md`.
+
 ### 3D (Three.js)
 
 `films/prova-3d/` mostra como fazer: a cena 3D é posicionada a partir de `t` e desenhada no quadro.

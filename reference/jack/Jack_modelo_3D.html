@@ -1,0 +1,350 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>O Curioso Jack - modelo do personagem</title>
+<!--
+  O CURIOSO JACK - modelo 3D do personagem, feito 100% por código (WebGL2, sem bibliotecas).
+  Como funciona:
+  - O motor (engine.js) desenha formas simples (esfera, cilindro, cone, caixa, toro, cápsula) com
+    sombra suave e luz do sol. Cada quadro é uma função pura do tempo: scene(t) monta a cena e renderFrame(t) desenha.
+  - O personagem (jack.js) é a função drawJack(P): um esqueleto articulado (quadril, joelho, ombro, cotovelo,
+    pulso, pescoço) em que cada parte é uma dessas formas, com as cores definidas em JC.
+    Parâmetros de pose (todos em radianos): yaw (giro do corpo), hipL/hipR, kneeL/kneeR, shL/shR (ombro para a frente),
+    abL/abR (braço para o lado), elL/elR (cotovelo), twL/twR (giro do braço), headYaw/headPitch, pointR (apontar).
+    Rosto: smile, grin (+1 sorriso curvo, negativo = boca triste), mouth (boca aberta), brow (sobrancelha),
+    gazeX/gazeY (olhar), blink (piscar achata o próprio olho; não existe pálpebra de pele).
+  - Tamanho: o Jack tem cerca de 2 unidades de altura, com os pés em y = 0 e olhando para +z.
+  Abra este arquivo num navegador com WebGL2. Os botões trocam a vista e a expressão.
+-->
+<style>body{margin:0;background:#1b1d24;font-family:sans-serif;color:#fff;text-align:center}
+#out{height:78vh;max-width:96vw;display:block;margin:8px auto;border-radius:8px}#gl{display:none}
+button{margin:3px;padding:8px 12px;border:0;border-radius:6px;background:#3a4160;color:#fff;font-size:14px}</style></head><body>
+<canvas id="gl" width="720" height="1280"></canvas><canvas id="out" width="720" height="1280"></canvas>
+<div><button data-k="vista" data-v="girar">Girar</button><button data-k="vista" data-v="frente">Frente</button><button data-k="vista" data-v="tres-quartos">3/4</button><button data-k="vista" data-v="lado">Lado</button><button data-k="vista" data-v="costas">Costas</button><button data-k="vista" data-v="rosto">Rosto</button></div>
+<div><button data-k="expr" data-v="neutro">Neutro</button><button data-k="expr" data-v="feliz">Feliz</button><button data-k="expr" data-v="surpreso">Surpreso</button><button data-k="expr" data-v="pensando">Pensando</button><button data-k="expr" data-v="triste">Triste</button></div>
+<script>
+// ===== engine.js: motor 3D =====
+// Motor 3D do Curioso Jack (WebGL2). Cada quadro é função pura do tempo.
+const W = 720, H = 1280;
+const canvas = document.getElementById('gl');
+const gl = canvas.getContext('webgl2', { antialias: true, preserveDrawingBuffer: true, alpha: false });
+const out = document.getElementById('out'); const ctx = out.getContext('2d');
+
+// ---------- matemática ----------
+const Mx = {
+  I: () => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+  mul(a, b) { const r = new Array(16); for (let c = 0; c < 4; c++) for (let w = 0; w < 4; w++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + w] * b[c * 4 + k]; r[c * 4 + w] = s; } return r; },
+  T: (x, y, z) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1],
+  S: (x, y, z) => { if (y === undefined) { y = x; z = x; } return [x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1]; },
+  Rx(a) { const c = Math.cos(a), s = Math.sin(a); return [1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1]; },
+  Ry(a) { const c = Math.cos(a), s = Math.sin(a); return [c, 0, -s, 0, 0, 1, 0, 0, s, 0, c, 0, 0, 0, 0, 1]; },
+  Rz(a) { const c = Math.cos(a), s = Math.sin(a); return [c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]; },
+  chain(...m) { return m.reduce((a, b) => Mx.mul(a, b)); },
+  pt(m, p) { return [m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12], m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13], m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14]]; },
+  persp(f, a, n, fa) { const t = 1 / Math.tan(f / 2); return [t / a, 0, 0, 0, 0, t, 0, 0, 0, 0, (fa + n) / (n - fa), -1, 0, 0, 2 * fa * n / (n - fa), 0]; },
+  ortho(r, n, f) { return [1 / r, 0, 0, 0, 0, 1 / r, 0, 0, 0, 0, -2 / (f - n), 0, 0, 0, -(f + n) / (f - n), 1]; },
+  look(e, c, u) { const z = V.norm(V.sub(e, c)), x = V.norm(V.cross(u, z)), y = V.cross(z, x); return [x[0], y[0], z[0], 0, x[1], y[1], z[1], 0, x[2], y[2], z[2], 0, -V.dot(x, e), -V.dot(y, e), -V.dot(z, e), 1]; },
+  nrm(m) { // inversa transposta 3x3
+    const a = m[0], b = m[1], c = m[2], d = m[4], e = m[5], f = m[6], g = m[8], h = m[9], i = m[10];
+    const A = e * i - f * h, B = f * g - d * i, C = d * h - e * g, det = a * A + b * B + c * C || 1e-9;
+    return [A / det, B / det, C / det, (c * h - b * i) / det, (a * i - c * g) / det, (b * g - a * h) / det, (b * f - c * e) / det, (c * d - a * f) / det, (a * e - b * d) / det];
+  }
+};
+const V = {
+  sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+  mul: (a, s) => [a[0] * s, a[1] * s, a[2] * s], dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+  cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+  norm(a) { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; },
+  mix: (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t],
+};
+const E = {
+  c01: x => Math.max(0, Math.min(1, x)),
+  seg: (t, a, b) => Math.max(0, Math.min(1, (t - a) / (b - a))),
+  ss: x => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); },
+  sseg: (t, a, b) => E.ss((t - a) / (b - a)),
+  mix: (a, b, t) => a + (b - a) * t,
+  inq: x => x * x, outq: x => 1 - (1 - x) * (1 - x),
+  back: x => { const c = 1.70158; x = E.c01(x); return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); },
+};
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+// ---------- geometria ----------
+function mkGeo(P, N, I) {
+  const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+  const b = (d, loc) => { const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(d), gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0); };
+  b(P, 0); b(N, 1);
+  const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(I), gl.STATIC_DRAW);
+  gl.bindVertexArray(null); return { vao, n: I.length };
+}
+// superfície de revolução: perfil [[r,y],...] de cima para baixo
+function lathe(prof, seg = 24, smooth = false, a0 = 0, a1 = Math.PI * 2) {
+  const P = [], N = [], I = []; const n = prof.length;
+  const sn = []; for (let i = 0; i < n - 1; i++) { const dr = prof[i + 1][0] - prof[i][0], dy = prof[i + 1][1] - prof[i][1], l = Math.hypot(dr, dy) || 1; sn.push([-dy / l, dr / l]); }
+  const ring = (r, y, nr, ny) => { for (let j = 0; j <= seg; j++) { const a = a0 + (a1 - a0) * j / seg, c = Math.cos(a), s = Math.sin(a); P.push(r * c, y, r * s); N.push(nr * c, ny, nr * s); } };
+  if (smooth) {
+    for (let i = 0; i < n; i++) { const a = sn[Math.max(0, i - 1)], b = sn[Math.min(n - 2, i)]; let nr = a[0] + b[0], ny = a[1] + b[1]; const l = Math.hypot(nr, ny) || 1; ring(prof[i][0], prof[i][1], nr / l, ny / l); }
+    for (let i = 0; i < n - 1; i++) for (let j = 0; j < seg; j++) { const a = i * (seg + 1) + j, b = a + seg + 1; I.push(a, b, a + 1, a + 1, b, b + 1); }
+  } else {
+    for (let i = 0; i < n - 1; i++) { ring(prof[i][0], prof[i][1], sn[i][0], sn[i][1]); ring(prof[i + 1][0], prof[i + 1][1], sn[i][0], sn[i][1]); const o = i * 2 * (seg + 1); for (let j = 0; j < seg; j++) { const a = o + j, b = a + seg + 1; I.push(a, b, a + 1, a + 1, b, b + 1); } }
+  }
+  return mkGeo(P, N, I);
+}
+function arcProf(r, y0, a0, a1, k) { const p = []; for (let i = 0; i <= k; i++) { const a = a0 + (a1 - a0) * i / k; p.push([Math.max(0, r * Math.sin(a)), y0 + r * Math.cos(a)]); } return p; }
+const SPH = lathe(arcProf(1, 0, 0, Math.PI, 18), 28, true);                 // raio 1
+const CYL = lathe([[0, .5], [1, .5], [1, -.5], [0, -.5]], 28);               // raio 1, altura 1 centrada
+const CONE = lathe([[0, 1], [1, 0], [0, 0]], 24);                            // base em y=0, ponta em y=1
+const DISC = lathe([[0, 0], [1, 0]], 28);
+const _caps = {};
+function CAP(r, len) { const k = r + '_' + len; if (!_caps[k]) _caps[k] = lathe(arcProf(r, 0, 0, Math.PI / 2, 7).concat(arcProf(r, -len, Math.PI / 2, Math.PI, 7)), 18, true); return _caps[k]; }
+const _tor = {};
+function TORUS(r) { if (_tor[r]) return _tor[r]; const P = [], N = [], I = [], S1 = 40, S2 = 10; for (let i = 0; i <= S1; i++) { const a = i / S1 * Math.PI * 2; for (let j = 0; j <= S2; j++) { const b = j / S2 * Math.PI * 2; const cx = Math.cos(a), cz = Math.sin(a); P.push((1 + r * Math.cos(b)) * cx, r * Math.sin(b), (1 + r * Math.cos(b)) * cz); N.push(Math.cos(b) * cx, Math.sin(b), Math.cos(b) * cz); } } for (let i = 0; i < S1; i++) for (let j = 0; j < S2; j++) { const a = i * (S2 + 1) + j, b = a + S2 + 1; I.push(a, b, a + 1, a + 1, b, b + 1); } return _tor[r] = mkGeo(P, N, I); }
+const BOX = (() => { const P = [], N = [], I = []; const f = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]; f.forEach((n, k) => { const u = [n[1], n[2], n[0]], v = V.cross(n, u); [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([a, b]) => { P.push(...[0, 1, 2].map(i => (n[i] + u[i] * a + v[i] * b) * .5)); N.push(...n); }); I.push(k * 4, k * 4 + 1, k * 4 + 2, k * 4, k * 4 + 2, k * 4 + 3); }); return mkGeo(P, N, I); })();
+function PLANE(n) { const P = [], N = [], I = []; for (let i = 0; i <= n; i++) for (let j = 0; j <= n; j++) { P.push(j / n - .5, 0, i / n - .5); N.push(0, 1, 0); } for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { const a = i * (n + 1) + j, b = a + n + 1; I.push(a, b, a + 1, a + 1, b, b + 1); } return mkGeo(P, N, I); }
+const PL1 = PLANE(1), PLW = PLANE(220);
+
+// ---------- shaders ----------
+const WAVE = `float wav(vec2 p,float t){ float a=smoothstep(0.5,6.,p.y); return a*(0.09*sin(0.55*p.y-1.3*t+0.25*p.x)+0.045*sin(1.2*p.x+0.8*p.y-1.9*t))+0.012*sin(3.*p.y-2.5*t); }`;
+function waveH(x, z, t) { const a = E.ss((z - .5) / 5.5); return a * (0.09 * Math.sin(0.55 * z - 1.3 * t + 0.25 * x) + 0.045 * Math.sin(1.2 * x + 0.8 * z - 1.9 * t)) + 0.012 * Math.sin(3 * z - 2.5 * t); }
+const VS = `#version 300 es
+layout(location=0) in vec3 aP; layout(location=1) in vec3 aN;
+uniform mat4 uM,uVP,uLVP; uniform mat3 uNm; uniform float uWater,uT;
+out vec3 vW,vN,vO; out vec4 vL;
+${WAVE}
+void main(){ vec4 w=uM*vec4(aP,1.); vec3 n=uNm*aN;
+ if(uWater>.5&&uWater<1.5){ float fd=smoothstep(.5,.42,max(abs(aP.x),abs(aP.z))); float e=.15; float h=wav(w.xz,uT)*fd; w.y+=h; float hx=wav(w.xz+vec2(e,0.),uT)*fd, hz=wav(w.xz+vec2(0.,e),uT)*fd; n=vec3(-(hx-h)/e,1.,-(hz-h)/e); }
+ vW=w.xyz; vN=n; vO=aP; vL=uLVP*w; gl_Position=uVP*w; }`;
+const FS = `#version 300 es
+precision highp float; precision highp sampler2DShadow;
+in vec3 vW,vN,vO; in vec4 vL; out vec4 o;
+uniform vec3 uC,uE,uSun,uSunC,uSky,uGnd,uEye,uFog; uniform vec4 uPat;
+uniform float uSpec,uGloss,uUnlit,uA,uWater,uT,uFogD,uRim,uShOn; uniform sampler2DShadow uSh; uniform vec2 uRes;
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
+float shadow(){ if(uShOn<.5) return 1.; vec3 q=vL.xyz/vL.w*.5+.5; if(q.x<0.||q.x>1.||q.y<0.||q.y>1.||q.z>1.) return 1.; float s=0.; float tx=1.5/2048.; for(int x=-1;x<=1;x++)for(int y=-1;y<=1;y++) s+=texture(uSh,vec3(q.xy+vec2(x,y)*tx,q.z-0.0022)); return s/9.; }
+void main(){
+ vec3 n=normalize(vN); vec3 c=uC; float a=uA; int pt=int(uPat.x+.5);
+ if(pt==1){ float g=noise(vec2(vO.y*uPat.y*7.,atan(vO.x,vO.z)*4.)); c*=mix(1.,.62,g*uPat.z); }
+ else if(pt==2){ c*=.9+.2*noise(vW.xz*14.); c*=mix(.7,1.,smoothstep(-0.02,0.12,vW.y)); c=mix(c*vec3(.75,.85,.9),c,smoothstep(-.7,-.05,vW.y)); }
+ else if(pt==3){ float r=length(vO.xz); c*=.82+.18*sin(r*uPat.y); }
+ else if(pt==4){ float s=step(.5,fract(vO.y*uPat.y+.25)); c*=mix(1.,uPat.z,s); }
+ else if(pt==5){ float s=step(.5,fract(vO.x*uPat.y)); c*=mix(1.,uPat.z,s); }
+ else if(pt==6){ c*=.84+.3*noise(vW.xz*uPat.y)*noise(vW.xz*uPat.y*.23+3.); }
+ vec3 Vv=normalize(uEye-vW);
+ if(uWater>.5){
+   float depth=0.12*vW.z;
+   c=mix(vec3(.05,.62,.64),vec3(.008,.17,.42),smoothstep(0.,2.6,depth));
+   float fr=pow(1.-max(dot(n,Vv),0.),3.); c=mix(c,uSky,fr*.55);
+   float sp=pow(max(dot(reflect(-uSun,n),Vv),0.),160.);
+   float foam=smoothstep(.06,.0,depth+0.02*sin(vW.x*2.+uT*1.5)+0.025*sin(uT*.9));
+   foam+=smoothstep(.72,1.,noise(vW.xz*2.5+vec2(uT*.25,-uT*.4)))*.22*smoothstep(0.2,1.5,depth);
+   float sh=mix(.55,1.,shadow());
+   c=c*(uSunC*.6*max(dot(n,uSun),0.)*sh+uSky*.55)+sp*uSunC*1.6*sh; c=mix(c,vec3(1.1),clamp(foam,0.,1.));
+   a=max(mix(.45,.95,smoothstep(0.,.9,depth)),clamp(foam,0.,1.));
+ } else if(uUnlit<.5){
+   float sh=shadow(); float d=max(dot(n,uSun),0.);
+   vec3 amb=mix(uGnd,uSky,n.y*.5+.5);
+   float sp=pow(max(dot(reflect(-uSun,n),Vv),0.),uGloss)*uSpec*sh;
+   float rim=pow(1.-max(dot(n,Vv),0.),3.)*uRim;
+   c=c*(amb+uSunC*d*sh)+sp*uSunC+rim*uSky*.5+uE;
+ } else c=c+uE;
+ float f=1.-exp(-length(uEye-vW)*uFogD); c=mix(c,uFog,f);
+ c=1.-exp(-c*1.25); c=pow(c,vec3(1./2.2));
+ vec2 uv=gl_FragCoord.xy/uRes-.5; c*=1.-dot(uv,uv)*.3;
+ o=vec4(c,a); }`;
+const VSS = `#version 300 es
+layout(location=0) in vec3 aP; uniform mat4 uM,uLVP; void main(){ gl_Position=uLVP*uM*vec4(aP,1.); }`;
+const FSS = `#version 300 es
+precision highp float; void main(){}`;
+const VSK = `#version 300 es
+out vec2 uv; void main(){ vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2)); uv=p*2.-1.; gl_Position=vec4(uv,0.9999,1.); }`;
+const FSK = `#version 300 es
+precision highp float; in vec2 uv; out vec4 o; uniform vec3 uR,uU,uF,uSun,uZen,uHor,uFog; uniform float uTan,uAsp;
+void main(){ vec3 d=normalize(uF+uR*uv.x*uTan*uAsp+uU*uv.y*uTan); float h=max(d.y,0.);
+ vec3 c=mix(uHor,uZen,pow(h,.55)); c=mix(c,uFog,smoothstep(0.02,-0.05,d.y));
+ float s=max(dot(d,uSun),0.); c+=vec3(1.,.85,.6)*(pow(s,600.)*4.+pow(s,24.)*.25);
+ c=1.-exp(-c*1.25); c=pow(c,vec3(1./2.2)); vec2 q=uv*.5; c*=1.-dot(q,q)*.3; o=vec4(c,1.); }`;
+function prog(vs, fs) { const p = gl.createProgram(); for (const [t, s] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) { const sh = gl.createShader(t); gl.shaderSource(sh, s); gl.compileShader(sh); if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh)); gl.attachShader(p, sh); } gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p)); const u = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS); for (let i = 0; i < n; i++) { const nm = gl.getActiveUniform(p, i).name; u[nm] = gl.getUniformLocation(p, nm); } return { p, u }; }
+const PM = prog(VS, FS), PS = prog(VSS, FSS), PK = prog(VSK, FSK);
+// mapa de sombras
+const SM = 2048; const shTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, shTex);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT24, SM, SM, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, null);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_FUNC, gl.LEQUAL);
+const shFB = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, shFB); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, shTex, 0); gl.drawBuffers([gl.NONE]); gl.readBuffer(gl.NONE); gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+// ---------- materiais e lista de desenho ----------
+function lin(hex) { const n = parseInt(hex.slice(1), 16); return [(n >> 16) / 255, (n >> 8 & 255) / 255, (n & 255) / 255].map(v => Math.pow(v, 2.2)); }
+const _mc = {};
+function M(hex, o) { if (!o) { return _mc[hex] || (_mc[hex] = { c: lin(hex) }); } return Object.assign({ c: lin(hex) }, o); }
+const R = { list: [], t: 0, sun: V.norm([-.45, .75, -.4]), sunC: [1.25, 1.12, .95], sky: [.55, .68, .9], gnd: [.42, .36, .28], zen: [.18, .42, .85], hor: [.72, .86, .98], fog: [.72, .84, .95], fogD: .0045, shC: [0, 0, 0], shR: 6, overlay: null };
+function beginFrame(t) { R.list = []; R.t = t; R.overlay = null; }
+function camera(eye, tgt, fov = .8) { R.eye = eye; R.tgt = tgt; R.fov = fov; }
+function draw(geo, mat, m) { R.list.push({ geo, mat, m }); }
+function flush() {
+  const f = V.norm(V.sub(R.tgt, R.eye)), r = V.norm(V.cross(f, [0, 1, 0])), u = V.cross(r, f);
+  const VP = Mx.mul(Mx.persp(R.fov, W / H, .08, 600), Mx.look(R.eye, R.tgt, [0, 1, 0]));
+  R.VP = VP;
+  const le = V.add(R.shC, V.mul(R.sun, 40)); const LVP = Mx.mul(Mx.ortho(R.shR, 1, 90), Mx.look(le, R.shC, [0, 1, 0]));
+  gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
+  // sombras
+  gl.bindFramebuffer(gl.FRAMEBUFFER, shFB); gl.viewport(0, 0, SM, SM); gl.clear(gl.DEPTH_BUFFER_BIT); gl.useProgram(PS.p); gl.uniformMatrix4fv(PS.u.uLVP, false, LVP);
+  gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(2, 4);
+  for (const d of R.list) { if (d.mat.water || d.mat.nosh || d.mat.mask || (d.mat.a !== undefined && d.mat.a < .99)) continue; gl.uniformMatrix4fv(PS.u.uM, false, d.m); gl.bindVertexArray(d.geo.vao); gl.drawElements(gl.TRIANGLES, d.geo.n, gl.UNSIGNED_INT, 0); }
+  gl.disable(gl.POLYGON_OFFSET_FILL);
+  // céu
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, W, H); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.useProgram(PK.p); gl.depthMask(false); gl.disable(gl.BLEND);
+  gl.uniform3fv(PK.u.uR, r); gl.uniform3fv(PK.u.uU, u); gl.uniform3fv(PK.u.uF, f); gl.uniform3fv(PK.u.uSun, R.sun); gl.uniform3fv(PK.u.uZen, R.zen); gl.uniform3fv(PK.u.uHor, R.hor); gl.uniform3fv(PK.u.uFog, R.fog);
+  gl.uniform1f(PK.u.uTan, Math.tan(R.fov / 2)); gl.uniform1f(PK.u.uAsp, W / H); gl.bindVertexArray(null); gl.drawArrays(gl.TRIANGLES, 0, 3); gl.depthMask(true);
+  // cena
+  const U = PM.u; gl.useProgram(PM.p);
+  gl.uniformMatrix4fv(U.uVP, false, VP); gl.uniformMatrix4fv(U.uLVP, false, LVP); gl.uniform3fv(U.uSun, R.sun); gl.uniform3fv(U.uSunC, R.sunC); gl.uniform3fv(U.uSky, R.sky); gl.uniform3fv(U.uGnd, R.gnd);
+  gl.uniform3fv(U.uEye, R.eye); gl.uniform3fv(U.uFog, R.fog); gl.uniform1f(U.uFogD, R.fogD); gl.uniform1f(U.uT, R.t); gl.uniform2f(U.uRes, W, H);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, shTex); gl.uniform1i(U.uSh, 0);
+  const one = d => { const m = d.mat; gl.uniformMatrix4fv(U.uM, false, d.m); gl.uniformMatrix3fv(U.uNm, false, Mx.nrm(d.m)); gl.uniform3fv(U.uC, m.c); gl.uniform3fv(U.uE, m.e || [0, 0, 0]); gl.uniform4fv(U.uPat, m.pat || [0, 0, 0, 0]);
+    gl.uniform1f(U.uSpec, m.spec || 0); gl.uniform1f(U.uGloss, m.gloss || 30); gl.uniform1f(U.uUnlit, m.unlit ? 1 : 0); gl.uniform1f(U.uA, m.a === undefined ? 1 : m.a); gl.uniform1f(U.uWater, m.water || 0); gl.uniform1f(U.uRim, m.rim === undefined ? .25 : m.rim); gl.uniform1f(U.uShOn, m.norecv ? 0 : 1);
+    gl.bindVertexArray(d.geo.vao); gl.drawElements(gl.TRIANGLES, d.geo.n, gl.UNSIGNED_INT, 0); };
+  const tr = d => d.mat.water || (d.mat.a !== undefined && d.mat.a < .99);
+  gl.disable(gl.BLEND); for (const d of R.list) if (!tr(d) && !d.mat.mask) one(d);
+  gl.colorMask(false, false, false, false); for (const d of R.list) if (d.mat.mask) one(d); gl.colorMask(true, true, true, true);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  const T = R.list.filter(tr).map(d => ({ d, z: -V.dot(V.sub([d.m[12], d.m[13], d.m[14]], R.eye), f) - (d.mat.water ? 1e6 : 0) })).sort((a, b) => a.z - b.z);
+  for (const x of T) { gl.depthMask(!!x.d.mat.water); one(x.d); } gl.depthMask(true); gl.disable(gl.BLEND);
+  gl.finish();
+}
+function renderFrame(t) {
+  window.scene(t); flush();
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.filter = 'none';
+  ctx.drawImage(canvas, 0, 0); if (R.overlay) R.overlay(ctx);
+  return out.toDataURL('image/jpeg', .92);
+}
+function proj(p) { const m = R.VP, x = m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12], y = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13], w = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15]; return [(x / w * .5 + .5) * W, (1 - (y / w * .5 + .5)) * H, w]; }
+window.READY = true;
+
+</script>
+<script>
+// ===== jack.js: o personagem =====
+// Jack: personagem articulado. Olha para +z. Lado "L" = +x, lado "R" = -x.
+const JC = {
+  skin: M('#f3d2b0', { rim: .35 }), skinD: M('#e2b08c'), hair: M('#6b3f22', { rim: .3 }), cap: M('#23221f', { spec: .15, gloss: 20 }),
+  gold: M('#d8a03a', { spec: .9, gloss: 50 }), lens: M('#8fd0f2', { spec: 1, gloss: 90, e: [.05, .12, .18] }),
+  jacket: M('#5f6638', { rim: .2 }), jacketD: M('#474d28'), strap: M('#5a3519', { spec: .2 }), belt: M('#2c1c12', { spec: .2 }), buckle: M('#c9c9c9', { spec: .8, gloss: 60 }),
+  btn: M('#eeeeea'), pants: M('#27304c'), boot: M('#4a2c17', { spec: .15 }), sole: M('#1d1410'),
+  white: M('#ffffff', { rim: 0 }), iris: M('#6a3a17', { rim: 0 }), pupil: M('#120b06', { rim: 0 }), mouth: M('#5a1414', { rim: 0 }), teeth: M('#f5f1e8', { rim: 0 }), brow: M('#5a341c', { rim: 0 }),
+};
+const JD = { thigh: .30, shin: .28, boot: .09, up: .23, fore: .21 };
+function jackPose(o) { return Object.assign({ pos: [0, 0, 0], yaw: 0, roll: 0, tip: 0, lean: 0, twist: 0, hipL: 0, hipR: 0, kneeL: 0, kneeR: 0, shL: 0, shR: 0, abL: .12, abR: .12, elL: .15, elR: .15, twL: 0, twR: 0, headYaw: 0, headPitch: 0, blink: 0, mouth: 0, smile: 0, brow: 0, gazeX: 0, gazeY: 0, pointR: 0, drop: 0 }, o || {}); }
+// altura do quadril para os pés tocarem o chão
+function jackHipY(P) { const f = (h, k) => JD.thigh * Math.cos(h) + JD.shin * Math.cos(k - h); return Math.max(f(P.hipL, P.kneeL), f(P.hipR, P.kneeR)) + JD.boot; }
+function walkPose(ph, amp = 1) { // ph em ciclos
+  const a = ph * Math.PI * 2, s = Math.sin(a), c = Math.cos(a);
+  return { hipL: .45 * s * amp, hipR: -.45 * s * amp, kneeL: Math.max(0, .15 + .75 * Math.max(0, -c) * (s > 0 ? .4 : 1)) * amp, kneeR: Math.max(0, .15 + .75 * Math.max(0, c) * (s < 0 ? .4 : 1)) * amp, shL: -.5 * s * amp, shR: .5 * s * amp, elL: .35, elR: .35, bob: .02 * Math.abs(c) * amp };
+}
+function drawJack(P) {
+  P = jackPose(P); const J = P.mats ? Object.assign({}, JC, P.mats) : JC; const C = Mx.chain, T = Mx.T, S = Mx.S, Rx = Mx.Rx, Ry = Mx.Ry, Rz = Mx.Rz;
+  const hipY = P.hipY !== undefined ? P.hipY : jackHipY(P) - P.drop;
+  const root = P.root || C(T(P.pos[0], P.pos[1], P.pos[2]), Ry(P.yaw), Rz(P.roll), Rx(P.tip), T(0, hipY, 0));
+  // pernas
+  for (const s of [1, -1]) {
+    const h = s > 0 ? P.hipL : P.hipR, k = s > 0 ? P.kneeL : P.kneeR;
+    const th = C(root, T(s * .085, 0, 0), Rx(-h)); draw(CAP(.072, JD.thigh), J.pants, th);
+    const sh = C(th, T(0, -JD.thigh, 0), Rx(k)); draw(CAP(.062, JD.shin), J.pants, sh);
+    const ft = C(sh, T(0, -JD.shin, 0), Rx(h - k));
+    draw(CAP(.07, .05), J.boot, C(ft, T(0, .03, 0)));
+    draw(BOX, J.boot, C(ft, T(0, -.04, .045), S(.125, .075, .2))); draw(SPH, J.boot, C(ft, T(0, -.04, .14), S(.0625, .0375, .06)));
+    draw(BOX, J.sole, C(ft, T(0, -.082, .05), S(.13, .016, .27)));
+  }
+  // tronco
+  const w = C(root, T(0, .02, 0), Rx(P.lean), Ry(P.twist));
+  draw(CYL, J.jacket, C(w, T(0, .05, 0), S(.196, .16, .136)));
+  draw(CAP(.5, 1), J.jacket, C(w, T(0, .395, 0), S(.40, .25, .272)));
+  draw(TORUS(.09), J.belt, C(w, T(0, .12, 0), S(.196, .2, .137))); draw(BOX, J.buckle, C(w, T(0, .12, .148), S(.05, .04, .012)));
+  draw(TORUS(.045), J.strap, C(w, T(0, .29, 0), Rz(-.72), S(.25, .3, .14)));
+  for (const s of [1, -1]) {
+    const pk = C(w, T(s * .092, .33, .112), Ry(s * .42));
+    draw(BOX, J.jacketD, C(pk, S(.085, .075, .016))); draw(BOX, J.jacket, C(pk, T(0, .028, .006), S(.092, .03, .016))); draw(SPH, J.btn, C(pk, T(0, .022, .016), S(.008)));
+    draw(BOX, J.jacketD, C(w, T(s * .05, .5, .085), Rz(s * .6), Rx(-.5), S(.075, .035, .016)));
+  }
+  for (const y of [.2, .27]) draw(SPH, J.btn, C(w, T(0, y, .139), S(.008)));
+  draw(CYL, J.skin, C(w, T(0, .565, 0), S(.042, .15, .042)));
+  // braços
+  const hands = {};
+  for (const s of [1, -1]) {
+    const L = s > 0, shd = L ? P.shL : P.shR, ab = L ? P.abL : P.abR, el = L ? P.elL : P.elR, tw = L ? P.twL : P.twR;
+    const up = C(w, T(s * .2, .45, 0), Rz(s * ab), Rx(-shd), Ry(s * tw)); draw(CAP(.058, JD.up), J.jacket, up);
+    const fo = C(up, T(0, -JD.up, 0), Rx(-el)); draw(CAP(.052, JD.fore), J.jacket, fo);
+    draw(CYL, J.jacketD, C(fo, T(0, -JD.fore + .01, 0), S(.057, .035, .057)));
+    const hd = C(fo, T(0, -JD.fore - .055, 0)); draw(SPH, J.skin, C(hd, S(.05, .06, .04)));
+    draw(SPH, J.skin, C(hd, T(-s * .035, .0, .02), S(.02, .03, .02)));
+    if (!L && P.pointR > 0) draw(CAP(.014, .06), J.skin, C(hd, T(0, -.04, .015), Rx(-.1), S(1, P.pointR, 1)));
+    hands[L ? 'L' : 'R'] = hd;
+  }
+  // cabeça
+  const head = C(w, T(0, .62, 0), Ry(P.headYaw), Rx(P.headPitch), T(0, .17, 0));
+  const HS = S(.2, .215, .195);
+  draw(SPH, J.skin, C(head, HS));
+  const on = (yaw, pit, r = 1) => C(head, HS, Ry(yaw), Rx(-pit), T(0, 0, r));
+  // cabelo, boina e óculos
+  draw(SPH, J.hair, C(head, T(0, .03, -.035), S(.207, .215, .2)));
+  if (P.plain) { draw(SPH, J.hair, C(head, T(0, .045, -.03), S(.21, .2, .205))); for (const s of [1, -1]) draw(SPH, J.skin, C(head, T(s * .198, -.01, -.01), S(.028, .048, .03))); if (P.plain === 2) draw(SPH, J.hair, C(head, T(0, .1, -.2), S(.09))); } else {
+  // cabelo espetado para cima (como no episódio de referência), faixa escura e óculos na frente
+  const rr = rng(7);
+  for (let i = 0; i < 12; i++) { const a = i / 12 * 6.283 + .26, front = Math.cos(a) > .55; const rad = front ? .06 : .115, hgt = (front ? .09 : .13) + rr() * .06;
+    draw(CONE, J.hair, C(head, T(0, front ? .2 : .175, -.02), Ry(a), T(0, 0, rad), Rx(.25 + rr() * .3), S(.052, hgt, .052))); }
+  for (let i = 0; i < 5; i++) { const a = i * 1.257 + .4; draw(CONE, J.hair, C(head, T(0, .215, -.03), Ry(a), T(0, 0, .045), Rx(.12 + rr() * .2), S(.05, .13 + rr() * .05, .05))); }
+  for (let i = 0; i < 7; i++) { const ya = 1.5 + i * .55, pi = .05 + rr() * .2; draw(CONE, J.hair, C(on(ya, pi, .92), Rx(Math.PI / 2 - .75), S(.26, .5 + rr() * .2, .26))); }
+  for (const s of [1, -1]) { draw(SPH, J.hair, C(on(s * 1.32, .1, .97), S(.13, .26, .06))); draw(SPH, J.skin, C(head, T(s * .198, -.01, -.01), S(.028, .048, .03))); }
+  const cap = C(head, T(0, .135, -.012), Rx(-.14));
+  draw(TORUS(.1), J.cap, C(cap, S(.2, .36, .195)));
+  for (const s of [1, -1]) { const g = C(cap, T(s * .06, .05, .178), Rx(1.15)); draw(TORUS(.22), J.gold, C(g, S(.05, .05, .05))); draw(DISC, J.lens, C(g, T(0, .004, 0), S(.045))); }
+  draw(BOX, J.gold, C(cap, T(0, .052, .182), Rx(1.15), S(.03, .012, .02)));
+  }
+  if (P.mask) { draw(BOX, M('#2b2b2e'), C(head, T(0, -.01, .2), S(.33, .34, .03))); draw(BOX, M('#1c3a2a', { spec: .8, gloss: 60 }), C(head, T(0, .03, .217), S(.2, .07, .01))); }
+  // olhos: a pálpebra NÃO existe como peça de pele; piscar achata o próprio olho
+  const k = 1 - .94 * E.c01(P.blink);
+  for (const s of [1, -1]) {
+    const e = (r) => C(on(s * .40, .06, r), S(1, k, 1));
+    draw(SPH, J.white, C(e(.985), S(.2, .25, .05)));
+    const g = C(e(1.0), T(P.gazeX * .04, P.gazeY * .05, 0));
+    draw(SPH, J.iris, C(g, S(.155, .19, .05))); draw(SPH, J.pupil, C(g, T(0, 0, .03), S(.085, .105, .04)));
+    if (k > .5) draw(SPH, J.white, C(g, T(.05, .07, .06), S(.035, .035, .02)));
+    draw(BOX, J.brow, C(on(s * .40, .46 + .05 * P.brow - .06 * Math.max(0, -P.brow), 1.0), Rz(s * (-.1 + .5 * Math.max(0, -P.brow))), S(.26, .075, .08)));
+  }
+  draw(SPH, J.skinD, C(on(0, -.13, .99), S(.1, .095, .1)));
+  const mo = E.c01(P.mouth), mw = .17 + .08 * P.smile - .04 * mo;
+  if (P.grin) { for (let i = -12; i <= 12; i++) { const q = i / 12; draw(SPH, J.mouth, C(on(q * .3 * Math.abs(P.grin), P.grin > 0 ? -.58 + .12 * q * q : -.55 - .1 * q * q, .985), S(.05, .036, .05))); } return { root, head, hands, hipY, waist: w }; }
+  draw(SPH, J.mouth, C(on(0, -.52, .985), S(mw, .025 + .15 * mo, .05)));
+  if (mo > .25) draw(SPH, J.teeth, C(on(0, -.52 + .1 * mo, 1.0), S(mw * .72, .035, .04)));
+  return { root, head, hands, hipY, waist: w };
+}
+
+</script>
+<script>
+// ===== Cena de demonstração: Jack em fundo neutro, com vistas e expressões =====
+const C_ = Mx.chain, T_ = Mx.T, S_ = Mx.S, Rx_ = Mx.Rx, Ry_ = Mx.Ry, Rz_ = Mx.Rz;
+function setSky(k) { // 0 = dia normal, 1 = muito alto (céu escuro)
+  R.sun = V.norm([.38, .8, .46]); R.sunC = [1.55, 1.36, 1.08]; R.sky = [.36, .48, .72]; R.gnd = [.3, .36, .2]; R.zen = V.mix([.1, .34, .85], [.01, .04, .22], k); R.hor = V.mix([.56, .78, .99], [.25, .45, .85], k); R.fog = V.mix([.66, .83, .98], [.3, .5, .85], k); R.fogD = .0022; }
+const ST = { vista: 'girar', expr: 'feliz' };
+const VISTAS = { frente: 0, 'tres-quartos': .75, lado: Math.PI / 2, costas: Math.PI };
+const EXPR = {
+  neutro:   { smile: .2, brow: 0 },
+  feliz:    { smile: 1, grin: 1, brow: .7 },
+  surpreso: { smile: 0, mouth: .8, brow: 1 },
+  pensando: { smile: 0, grin: -.25, brow: .25, gazeY: .9, gazeX: .6 },
+  triste:   { smile: 0, grin: -.55, brow: -.5, gazeY: -.6 },
+};
+function blinkF(t) { const p = t % 3.7; return p < .12 ? Math.sin(p / .12 * Math.PI) : 0; }
+window.scene = function (t) {
+  beginFrame(t); setSky(0); R.sun = V.norm([.45, .8, .55]); R.fogD = 0;
+  const bg = M('#e4e7ec', { spec: 0 });
+  draw(BOX, bg, C_(T_(0, -.05, 0), S_(40, .1, 40))); draw(BOX, bg, C_(T_(0, 6, -3), S_(40, 14, .1)));
+  R.shC = [0, 0, 0]; R.shR = 3;
+  const perto = ST.vista === 'rosto';
+  if (perto) camera([0, 1.66, 2.1], [0, 1.64, 0], .52); else camera([0, 1.02, 4.3], [0, 1.0, 0], .52);
+  const yaw = ST.vista === 'girar' ? t * .6 : (VISTAS[ST.vista] || 0);
+  drawJack(Object.assign({ pos: [0, 0, 0], yaw, abL: .32, abR: .32, elL: .12, elR: .12, blink: blinkF(t) }, EXPR[ST.expr]));
+};
+// Visualização ao vivo no navegador (a captura quadro a quadro chama renderFrame(t) direto)
+if (!window.NO_LOOP) { const t0 = performance.now(); (function loop() { renderFrame((performance.now() - t0) / 1000); requestAnimationFrame(loop); })(); }
+document.querySelectorAll('button').forEach(b => b.onclick = () => { ST[b.dataset.k] = b.dataset.v; });
+</script>
+</body></html>

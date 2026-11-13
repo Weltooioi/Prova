@@ -62,3 +62,22 @@ node tools/serve.mjs                 # preview at http://127.0.0.1:5173/films/<f
 Copy `films/prova-intro`, edit `film.json` (width, height, fps, duration, bpm; or `"track": "music.wav"` to use a
 supplied track, whose beats are then measured), write `frame(t, film)` in film.js and the score in score.mjs.
 Fonts: the studio pair is Inter Display (display) + JetBrains Mono (UI); list them in `fonts` so they load before frame 0.
+
+---
+
+# O Curioso Jack (series rules override the studio defaults above)
+
+The series method, script format, mandatory character rules and sound rules live in the `curioso-jack-animacao` skill;
+load it for any Jack episode. In this repo:
+
+- **The character and engine are the originals**, not a reconstruction: `lib/jack-engine/engine.js` (WebGL2 engine,
+  no libraries) and `lib/jack-engine/jack.js` (`drawJack(P)`), extracted from `reference/jack/Jack_modelo_3D.html`.
+  Load them as classic scripts before the film module; the page needs `<canvas id="gl">` (see `films/jack-original`).
+  Each frame: `beginFrame(t)`, set `R`, `camera(...)`, `draw(...)` / `drawJack(...)`, `flush()`, then
+  `film.ctx.drawImage(gl canvas)`.
+- Blinking flattens the eye itself (`blink`); there is no skin eyelid. Do not add one.
+- References: `reference/jack/ficha_*.png` (views, expressions, poses) and `como_e_feito_30s.mp4`.
+  `films/jack-original` renders the same shots for side-by-side checks (`--still 0.5` … `13.5`).
+- Differences from the studio defaults: 24 fps; the series look (low-poly, flat colours, warm sun, blue sky) instead of
+  "one accent colour"; narration first, with effects and music at least 15 dB under the voice, not -14 LUFS music.
+- Known gap: the original `drawJack` has no thumbs-up hand; the "joinha" pose shows a fist until one is added.
