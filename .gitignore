@@ -7,3 +7,4 @@ films/*/score.wav
 *.mp3
 *.wav
 .DS_Store
+!reference/**/*.mp4
